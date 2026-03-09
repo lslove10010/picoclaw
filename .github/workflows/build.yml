@@ -1,20 +1,32 @@
-name: build
+name: Build PicoClaw Full Version
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
+  workflow_dispatch: # 允许手动触发构建
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          go-version-file: go.mod
+          fetch-depth: 0
 
-      - name: Build
-        run: make build-all
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23' # 建议使用较新的 Go 版本
+
+      - name: Build Binary with All Tags
+        run: |
+          # 使用 -tags all 确保包含 wecom_aibot 等所有频道
+          # 使用 -ldflags 减小体积并注入版本信息
+          go build -v -tags "all" -ldflags="-s -w" -o picoclaw-linux-amd64 ./cmd/picoclaw
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: picoclaw-full-amd64
+          path: picoclaw-linux-amd64
