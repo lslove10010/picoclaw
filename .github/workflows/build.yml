@@ -1,32 +1,13 @@
-name: Build PicoClaw Full Version
-
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch: # 允许手动触发构建
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23' # 建议使用较新的 Go 版本
-
-      - name: Build Binary with All Tags
+- name: Build Binary with All Tags
         run: |
-          # 使用 -tags all 确保包含 wecom_aibot 等所有频道
-          # 使用 -ldflags 减小体积并注入版本信息
-          go build -v -tags "all" -ldflags="-s -w" -o picoclaw-linux-amd64 ./cmd/picoclaw
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: picoclaw-full-amd64
-          path: picoclaw-linux-amd64
+          # 1. 找到包含 main.go 的目录（通常是 cmd/picoclaw）
+          MAIN_DIR=$(find . -name "main.go" -path "*/picoclaw/*" | xargs dirname)
+          echo "Building from: $MAIN_DIR"
+          
+          # 2. 进入该目录执行构建
+          cd "$MAIN_DIR"
+          
+          # 3. 核心构建命令
+          # -tags "all" 确保激活 wecom_aibot
+          # -o ../../picoclaw-linux-amd64 将编译好的文件放回根目录
+          go build -v -tags "all" -
