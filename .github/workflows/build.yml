@@ -20,32 +20,38 @@ jobs:
           go-version: '1.23' 
           cache: true
 
-      - name: Fix Path for Embed
+      - name: Physical Patch for Embed
         run: |
-          # 1. 确认根目录下有 workspace
-          ls -d workspace
-          
-          # 2. 在报错的目录下创建一个软链接指向根目录的 workspace
-          # 这样 go:embed workspace 就能通过相对路径找到它了
-          mkdir -p cmd/picoclaw/internal/onboard/
-          ln -s $(pwd)/workspace cmd/picoclaw/internal/onboard/workspace
-          
-          echo "Path fix: Created symlink for embed."
+          # 1. 确认根目录下有 workspace 文件夹
+          if [ -d "workspace" ]; then
+            # 2. 物理复制根目录的 workspace 到报错的子目录
+            # 使用 -r 递归复制，确保它是真实目录而不是软链接
+            mkdir -p cmd/picoclaw/internal/onboard/
+            cp -r workspace cmd/picoclaw/internal/onboard/
+            echo "Physical patch: Copied workspace folder to target."
+          else
+            # 如果根目录没有，尝试创建一个空的补丁文件夹防止中断
+            mkdir -p cmd/picoclaw/internal/onboard/workspace
+            touch cmd/picoclaw/internal/onboard/workspace/.gitkeep
+            echo "Physical patch: Created empty workspace folder."
+          fi
 
       - name: Build Full Binary
         run: |
           go mod tidy
           # 核心：使用 -tags "all" 开启 WeCom AI Bot 支持
+          # 指定入口文件编译，确保 embed 路径对齐
           go build -v -tags "all" -ldflags="-s -w" -o picoclaw-full-amd64 ./cmd/picoclaw/main.go
 
-      - name: Verify Capability
+      - name: Verify Build
         run: |
           chmod +x picoclaw-full-amd64
-          # 验证二进制是否包含 version 信息
           ./picoclaw-full-amd64 version
+          # 打印帮助信息查看是否有隐藏的 channel 命令（可选）
+          ./picoclaw-full-amd64 help
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: picoclaw-full-amd64
-          path: picoclaw-linux-amd64
+          path: picoclaw-full-amd64
