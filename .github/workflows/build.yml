@@ -1,13 +1,47 @@
-- name: Build Binary with All Tags
+name: Build PicoClaw Full Version
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # 允许手动点击按钮触发构建
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # 使用稳定版 v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true # 开启缓存，加快后续构建速度
+
+      - name: Build Full Binary
         run: |
-          # 1. 找到包含 main.go 的目录（通常是 cmd/picoclaw）
-          MAIN_DIR=$(find . -name "main.go" -path "*/picoclaw/*" | xargs dirname)
-          echo "Building from: $MAIN_DIR"
+          # 1. 显式清理并确保依赖下载
+          go mod tidy
           
-          # 2. 进入该目录执行构建
-          cd "$MAIN_DIR"
-          
-          # 3. 核心构建命令
-          # -tags "all" 确保激活 wecom_aibot
-          # -o ../../picoclaw-linux-amd64 将编译好的文件放回根目录
-          go build -v -tags "all" -
+          # 2. 核心构建命令：
+          # -tags "all" 激活企业微信 AI 机器人模块
+          # -ldflags "-s -w" 压缩体积
+          # 目标路径直接指向包含 main.go 的入口
+          go build -v -tags "all" -ldflags="-s -w" -o picoclaw-linux-amd64 ./cmd/picoclaw/main.go
+
+      - name: Check Binary Capability
+        run: |
+          # 验证二进制文件是否生成
+          ls -lh picoclaw-linux-amd64
+          # 尝试运行 version 确保编译无误
+          chmod +x picoclaw-linux-amd64
+          ./picoclaw-linux-amd64 version
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: picoclaw-full-amd64
+          path: picoclaw-linux-amd64
+          retention-days: 7 # 构建物保存7天
