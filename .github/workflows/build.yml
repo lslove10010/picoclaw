@@ -3,45 +3,49 @@ name: Build PicoClaw Full Version
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: # 允许手动点击按钮触发构建
+  workflow_dispatch: 
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4 # 使用稳定版 v4
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
-          cache: true # 开启缓存，加快后续构建速度
+          go-version: '1.23' 
+          cache: true
+
+      - name: Fix Path for Embed
+        run: |
+          # 1. 确认根目录下有 workspace
+          ls -d workspace
+          
+          # 2. 在报错的目录下创建一个软链接指向根目录的 workspace
+          # 这样 go:embed workspace 就能通过相对路径找到它了
+          mkdir -p cmd/picoclaw/internal/onboard/
+          ln -s $(pwd)/workspace cmd/picoclaw/internal/onboard/workspace
+          
+          echo "Path fix: Created symlink for embed."
 
       - name: Build Full Binary
         run: |
-          # 1. 显式清理并确保依赖下载
           go mod tidy
-          
-          # 2. 核心构建命令：
-          # -tags "all" 激活企业微信 AI 机器人模块
-          # -ldflags "-s -w" 压缩体积
-          # 目标路径直接指向包含 main.go 的入口
-          go build -v -tags "all" -ldflags="-s -w" -o picoclaw-linux-amd64 ./cmd/picoclaw/main.go
+          # 核心：使用 -tags "all" 开启 WeCom AI Bot 支持
+          go build -v -tags "all" -ldflags="-s -w" -o picoclaw-full-amd64 ./cmd/picoclaw/main.go
 
-      - name: Check Binary Capability
+      - name: Verify Capability
         run: |
-          # 验证二进制文件是否生成
-          ls -lh picoclaw-linux-amd64
-          # 尝试运行 version 确保编译无误
-          chmod +x picoclaw-linux-amd64
-          ./picoclaw-linux-amd64 version
+          chmod +x picoclaw-full-amd64
+          # 验证二进制是否包含 version 信息
+          ./picoclaw-full-amd64 version
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: picoclaw-full-amd64
           path: picoclaw-linux-amd64
-          retention-days: 7 # 构建物保存7天
